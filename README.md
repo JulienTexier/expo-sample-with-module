@@ -10,18 +10,34 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Prebuild the app
 
    ```bash
-    npx expo start
+   npm run prebuild
    ```
+
+   This command will create the `android` and `ios` directories, which are required for building the app for Android and iOS.
+
+3. Start the android app
+
+   ```bash
+    npm run android
+   ```
+
+4. Start the ios app
+
+   ```bash
+    npm run ios
+   ```
+
+> [!IMPORTANT]  
+> Whenever you make native changes, you have the run prebuild and rebuild your apps.
 
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
