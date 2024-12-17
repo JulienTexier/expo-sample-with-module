@@ -1,17 +1,15 @@
 {
-  "platforms": [
-    "apple",
-    "android",
-    "web"
-  ],
+  "platforms": ["apple", "android"],
   "apple": {
-    "modules": [
-      "HsmModule"
-    ]
+    "modules": ["HsmModule"]
   },
   "android": {
-    "modules": [
-      "expo.modules.hsm.HsmModule"
-    ]
+    "gradleAarProjects": [
+      {
+        "name": "shared-android-0.1.0-alpha2",
+        "aarFilePath": "android/libs/shared-android-0.1.0-alpha2.aar"
+      }
+    ],
+    "modules": ["expo.modules.hsm.HsmModule"]
   }
 }

@@ -5,6 +5,8 @@ import { HsmModuleEvents } from './Hsm.types';
 declare class HsmModule extends NativeModule<HsmModuleEvents> {
   PI: number;
   hello(): string;
+  parseCode(code: string): string;
+  parseCodeWithResult(code: string): string;
   setValueAsync(value: string): Promise<void>;
 }
 

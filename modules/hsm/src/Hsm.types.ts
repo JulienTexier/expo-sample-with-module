@@ -17,3 +17,16 @@ export type HsmViewProps = {
   onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
   style?: StyleProp<ViewStyle>;
 };
+
+export type IQrCode = any;
+
+type Success = {
+  success: true;
+  qrCode: IQrCode;
+};
+
+type Failure = {
+  success: false;
+};
+
+export type HsMDeviceCodeParsingResult = Success | Failure;

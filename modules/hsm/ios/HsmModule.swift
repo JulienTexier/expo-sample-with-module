@@ -1,5 +1,7 @@
 import ExpoModulesCore
 
+// TODO: Import the native module here
+
 public class HsmModule: Module {
   // Each module class must implement the definition function. The definition consists of components
   // that describes the module's functionality and behavior.
@@ -23,6 +25,16 @@ public class HsmModule: Module {
       return "Hello world! 👋"
     }
 
+    Function("parseCode") { (code: String) in
+      // HsMDeviceCodeParser.parseCode(code)
+      return "Hello world! 👋"
+    }
+
+    Function("parseCodeWithResult") {(code: String) in
+      // HsMDeviceCodeParser.parseCodeWithResult(code)
+      return "Hello world! 👋"
+    }
+
     // Defines a JavaScript function that always returns a Promise and whose native code
     // is by default dispatched on the different thread than the JavaScript runtime runs on.
     AsyncFunction("setValueAsync") { (value: String) in
@@ -30,19 +42,6 @@ public class HsmModule: Module {
       self.sendEvent("onChange", [
         "value": value
       ])
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of the
-    // view definition: Prop, Events.
-    View(HsmView.self) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { (view: HsmView, url: URL) in
-        if view.webView.url != url {
-          view.webView.load(URLRequest(url: url))
-        }
-      }
-
-      Events("onLoad")
     }
   }
 }

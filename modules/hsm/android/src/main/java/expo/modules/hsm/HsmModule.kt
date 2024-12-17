@@ -4,6 +4,8 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.net.URL
 
+import com.hagleitner.basetypes.qr.HsMDeviceCodeParser
+
 class HsmModule : Module() {
   // Each module class must implement the definition function. The definition consists of components
   // that describes the module's functionality and behavior.
@@ -27,6 +29,15 @@ class HsmModule : Module() {
       "Hello world! 👋"
     }
 
+    Function("parseCode") { code: String ->
+      HsMDeviceCodeParser.parseCode(code)
+    }
+   
+
+    Function("parseCodeWithResult") { code: String ->
+      HsMDeviceCodeParser.parseCodeWithResult(code)
+    }
+
     // Defines a JavaScript function that always returns a Promise and whose native code
     // is by default dispatched on the different thread than the JavaScript runtime runs on.
     AsyncFunction("setValueAsync") { value: String ->
@@ -34,17 +45,6 @@ class HsmModule : Module() {
       sendEvent("onChange", mapOf(
         "value" to value
       ))
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(HsmView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: HsmView, url: URL ->
-        view.webView.loadUrl(url.toString())
-      }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
     }
   }
 }
