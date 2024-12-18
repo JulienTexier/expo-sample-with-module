@@ -26,14 +26,16 @@ export default function HomeScreen() {
         <Button
           title="Test QR Code"
           onPress={() => {
-            HsmModule.parseCode("test");
+            const result = HsmModule.parseCode("test");
+            console.log("result", result);
           }}
         />
         <ThemedText type="subtitle">ParseCodeWithResult</ThemedText>
         <Button
           title="Test QR Code"
           onPress={() => {
-            HsmModule.parseCodeWithResult("test");
+            const result = HsmModule.parseCodeWithResult("test");
+            console.log("result", result);
           }}
         />
       </ThemedView>

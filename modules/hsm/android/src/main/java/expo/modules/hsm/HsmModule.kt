@@ -5,6 +5,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.net.URL
 
 import com.hagleitner.basetypes.qr.HsMDeviceCodeParser
+import com.hagleitner.basetypes.qr.exception.qr.InvalidQrCodeFormat
 
 class HsmModule : Module() {
   // Each module class must implement the definition function. The definition consists of components
@@ -30,12 +31,19 @@ class HsmModule : Module() {
     }
 
     Function("parseCode") { code: String ->
-      HsMDeviceCodeParser.parseCode(code)
+      try {
+        HsMDeviceCodeParser.parseCode(code)
+      } catch (e: InvalidQrCodeFormat) {
+        throw Exception("Invalid QR Code Format: ${e.message}")
+      }
     }
-   
 
     Function("parseCodeWithResult") { code: String ->
-      HsMDeviceCodeParser.parseCodeWithResult(code)
+      val result = HsMDeviceCodeParser.parseCodeWithResult(code)
+      mapOf(
+        "success" to result.success,
+        "qrCode" to result.qrCode?.toString()
+      )
     }
 
     // Defines a JavaScript function that always returns a Promise and whose native code
