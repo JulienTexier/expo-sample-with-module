@@ -4,12 +4,6 @@
     "modules": ["HsmModule"]
   },
   "android": {
-    "gradleAarProjects": [
-      {
-        "name": "shared-android-0.1.0-alpha2",
-        "aarFilePath": "android/libs/shared-android-0.1.0-alpha2.aar"
-      }
-    ],
     "modules": ["expo.modules.hsm.HsmModule"]
   }
 }
