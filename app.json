@@ -26,6 +26,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-custom-maven.js",
       [
         "expo-splash-screen",
         {
