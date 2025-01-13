@@ -13,6 +13,15 @@ function addCustomMavenRepository(buildGradle) {
                 password = System.getenv("GITHUB_PAT") ?: ""
             }
         }
+
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Hagleitner-HsM/hsm-device-communications-kmm-distribution")
+            credentials {
+                username = System.getenv("GITHUB_USERNAME") ?: ""
+                password = System.getenv("GITHUB_PAT") ?: ""
+            }
+        }
     `;
 
   // Find the 'repositories {' block and inject the maven block correctly
