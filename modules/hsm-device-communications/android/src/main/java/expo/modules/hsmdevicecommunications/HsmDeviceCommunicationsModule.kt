@@ -2,49 +2,92 @@ package expo.modules.hsmdevicecommunications
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.net.URL
+import java.util.Base64
+import com.google.gson.Gson
+import com.hagleitner.hsmdevicecommunications.*
+import com.hagleitner.hsmdevicecommunications.bleconnectionprotocol.builder.BleConnectionProtocolMessageBuilder
+import expo.modules.kotlin.types.TypeConverter
+import com.google.gson.JsonObject
+
+// TLVConverter for converting between JavaScript and Kotlin TLV
+// class TLVConverter : TypeConverter<TLV> {
+//     // Implementing the 'convert' method
+//     override fun convert(value: Any?, context: AppContext?): TLV? {
+//         if (value == null) return null
+//         val json = value as? JsonObject ?: return null
+//         val tag = json.get("tag")?.asInt ?: return null
+//         val valueStr = json.get("value")?.asString ?: return null
+//         return TLV(tag, valueStr)
+//     }
+
+//     // Convert from Kotlin TLV to JSON
+//     override fun fromSerializable(serialized: Any): TLV {
+//         val json = serialized as? JsonObject ?: throw IllegalArgumentException("Expected JsonObject for TLV")
+//         val tag = json.get("tag")?.asInt ?: throw IllegalArgumentException("Missing 'tag' in TLV")
+//         val value = json.get("value")?.asString ?: throw IllegalArgumentException("Missing 'value' in TLV")
+//         return TLV(tag, value)
+//     }
+
+//     // Convert from Kotlin TLV to JSON
+//     override fun toSerializable(value: TLV): Any {
+//         val json = JsonObject()
+//         json.addProperty("tag", value.tag)
+//         json.addProperty("value", value.value)
+//         return json
+//     }
+// }
 
 class HsmDeviceCommunicationsModule : Module() {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
   override fun definition() = ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('HsmDeviceCommunications')` in JavaScript.
     Name("HsmDeviceCommunications")
 
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants(
-      "PI" to Math.PI
-    )
+    // Register TLVConverter
+    // TypeConverter(TLV::class, TLVConverter()) // Remove extra parameters
 
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
+    Function("parseBleAdvertisementWithoutDecryption") { characteristicValue: String ->
+        try {
+            val byteArray = Base64.getDecoder().decode(characteristicValue)
+            val result = parseBleAdvertisementWithoutDecryption(byteArray)
+            return@Function Gson().toJson(result)
+        } catch (e: IllegalArgumentException) {
+            println("Invalid Base64 string: ${e.message}")
+            return@Function null
+        }
     }
 
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
+    Function("decryptResourcesValues") { encryptedResourceValuesHex: String, decryptionKey: String ->
+        try {
+            val result: ByteArray = decryptResourcesValues(encryptedResourceValuesHex, decryptionKey)
+            return@Function Gson().toJson(result)
+        } catch (e: IllegalArgumentException) {
+            println("Error while decoding: ${e.message}")
+            return@Function null
+        }
     }
 
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(HsmDeviceCommunicationsView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: HsmDeviceCommunicationsView, url: URL ->
-        view.webView.loadUrl(url.toString())
-      }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
+    Function("getResourcesValuesAsInt") { decryptedByteArray: String, offset: Int, length: Int ->
+        try {
+            val byteArray = Base64.getDecoder().decode(decryptedByteArray)
+            val result = getResourcesValuesAsInt(byteArray, offset, length)
+            return@Function result
+        } catch (e: IllegalArgumentException) {
+            println("Error in getResourcesValuesAsInt: ${e.message}")
+            return@Function null
+        }
     }
+
+    // Function("buildEncryptedMessage") { tlvs: List<TLV>, key: String ->
+    //     try {
+    //         val message = BleConnectionProtocolMessageBuilder.buildEncryptedMessage(tlvs, key)
+    //         val jsonResult = mapOf(
+    //             "first" to Base64.getEncoder().encodeToString(message.first),
+    //             "tlvIds" to message.second
+    //         )
+    //         return@Function Gson().toJson(jsonResult)
+    //     } catch (e: Exception) {
+    //         println("Error in buildEncryptedMessage: ${e.message}")
+    //         return@Function null
+    //     }
+    // }
   }
 }

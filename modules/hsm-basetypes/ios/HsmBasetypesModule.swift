@@ -1,14 +1,25 @@
 import ExpoModulesCore
 
-public class HsmDeviceCommunicationsModule: Module {
+// TODO: Integrate iOS module if we make the app available for iOS in the future
+
+public class HsmBasetypesModule: Module {
   // Each module class must implement the definition function. The definition consists of components
   // that describes the module's functionality and behavior.
   // See https://docs.expo.dev/modules/module-api for more details about available components.
   public func definition() -> ModuleDefinition {
     // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
     // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('HsmDeviceCommunications')` in JavaScript.
-    Name("HsmDeviceCommunications")
+    // The module will be accessible from `requireNativeModule('HsmBasetypes')` in JavaScript.
+    Name("HsmBasetypes")
 
+    Function("parseCode") { (code: String) in
+      // HsMDeviceCodeParser.parseCode(code)
+      return "Hello world! 👋"
+    }
+
+    Function("parseCodeWithResult") {(code: String) in
+      // HsMDeviceCodeParser.parseCodeWithResult(code)
+      return "Hello world! 👋"
+    }
   }
 }

@@ -1,19 +1,21 @@
-import type { StyleProp, ViewStyle } from 'react-native';
+export type ByteArray = Uint8Array;
 
-export type OnLoadEventPayload = {
-  url: string;
+/**
+ * Represents a Bluetooth Low Energy advertisement with associated information.
+ */
+export type BleAdvertisementV2 = {
+  connectionActive: boolean;
+  deviceConnectionState: BleDeviceConnectionState;
+  deviceType: number; // UByte in Kotlin is equivalent to number in TypeScript
+  oemType: number; // UByte in Kotlin is equivalent to number in TypeScript
+  encryptedResourceValuesHex: string;
 };
 
-export type HsmDeviceCommunicationsModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
-};
-
-export type ChangeEventPayload = {
-  value: string;
-};
-
-export type HsmDeviceCommunicationsViewProps = {
-  url: string;
-  onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
-  style?: StyleProp<ViewStyle>;
-};
+/**
+ * Enum representing the different connection states of a BLE device.
+ */
+export enum BleDeviceConnectionState {
+  NO_CONNECTION = 'NO_CONNECTION',
+  BLE_CONNECTION = 'BLE_CONNECTION',
+  LORA_CONNECTION = 'LORA_CONNECTION',
+}

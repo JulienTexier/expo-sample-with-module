@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android"],
-  "apple": {
-    "modules": ["HsmModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.hsm.HsmModule"]
-  }
-}
