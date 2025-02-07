@@ -1,5 +1,5 @@
 import DeviceModal from "@/components/DeviceConnectionModal";
-import useBLE from "@/hooks/use-ble";
+import useBLE, { getEncryptionKey } from "@/hooks/use-ble";
 import React, { useState } from "react";
 import { Button, Text, View } from "react-native";
 
@@ -28,7 +28,7 @@ export default function Bluetooth() {
     connectToDevice,
     connectedDevice,
     data,
-    buildEncryptedMessage,
+    writeToDevice,
     disconnectFromDevice,
   } = useBLE();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
@@ -86,34 +86,25 @@ export default function Bluetooth() {
 
   // Encrypt and send a message
   const sendMessage = async () => {
-    // if (!connectedDevice) {
-    //   console.log("Device not found!");
-    //   return;
-    // }
-    // // Prepare your TLV object and key
-    // const tlvs = [
-    //   { tag: 1, value: "YourValue1" }, // Example TLV structure
-    //   { tag: 2, value: "YourValue2" },
-    // ];
-    // const key = "yourEncryptionKey";
-    // try {
-    //   // Call the Expo module to build the encrypted message
-    //   const encryptedMessageJson = await buildEncryptedMessage(tlvs, key);
-    //   const encryptedMessage = JSON.parse(encryptedMessageJson);
-    //   const encryptedData = encryptedMessage.first; // Base64 encoded data
-    //   const tlvIds = encryptedMessage.tlvIds;
-    //   console.log("Encrypted Message:", encryptedData);
-    //   console.log("TLV IDs:", tlvIds);
-    //   // Send encrypted message to the Bluetooth device
-    //   await connectedDevice.writeCharacteristicWithResponseForService(
-    //     "yourServiceUUID", // Replace with the actual service UUID
-    //     "yourCharacteristicUUID", // Replace with the actual characteristic UUID
-    //     encryptedData
-    //   );
-    //   console.log("Encrypted message sent to device!");
-    // } catch (error) {
-    //   console.error("Error while sending message:", error);
-    // }
+    if (!connectedDevice) {
+      console.log("Device not found!");
+      return;
+    }
+
+    try {
+      // Locate device (it will start blinking)
+      const encryptedMessage = await writeToDevice(
+        connectedDevice.id,
+        "0007",
+        "00",
+        "1",
+        getEncryptionKey(data?.localName ?? null)
+      );
+
+      console.log("encryptedMessage", encryptedMessage);
+    } catch (error) {
+      console.error("Error while sending message:", error);
+    }
   };
 
   return (

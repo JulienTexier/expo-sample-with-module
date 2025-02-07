@@ -66,6 +66,14 @@ export interface BluetoothLowEnergyApi {
     tlvs: any[], // Replace with the actual TLV type if available
     key: string
   ): { first: Uint8Array; second: number[] } | null;
+
+  writeToDevice(
+    peripheralId: string,
+    resourceType: string,
+    instance: string,
+    value: string,
+    key: string
+  ): { first: Uint8Array; second: number[] } | null;
 }
 
 function useBLE(): BluetoothLowEnergyApi {
@@ -337,6 +345,36 @@ function useBLE(): BluetoothLowEnergyApi {
     }
   };
 
+  async function writeToDevice(
+    peripheralId: string,
+    resourceType: string,
+    instance: string,
+    value: string,
+    key: string
+  ) {
+    try {
+      const valueBase64 = Buffer.from(value).toString("base64");
+
+      const result = await HsmDeviceCommunicationsModule.writeEncrypted(
+        resourceType,
+        instance,
+        valueBase64,
+        key
+      );
+
+      const res = await bleManager.writeCharacteristicWithResponseForDevice(
+        peripheralId,
+        SERVICE_UUID,
+        WRITE_CHARACTERISTIC_UUID,
+        result.encryptedData
+      );
+
+      console.log("Write successful:", res);
+    } catch (error) {
+      console.error("Write failed:", error);
+    }
+  }
+
   return {
     scanForPeripherals,
     stopScanningForPeripherals,
@@ -350,6 +388,7 @@ function useBLE(): BluetoothLowEnergyApi {
     decryptResourcesValues,
     getResourcesValuesAsInt,
     buildEncryptedMessage,
+    writeToDevice,
   };
 }
 

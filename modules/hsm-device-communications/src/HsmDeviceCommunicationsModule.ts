@@ -1,6 +1,6 @@
-import { NativeModule, requireNativeModule } from 'expo';
+import { NativeModule, requireNativeModule } from "expo";
 
-import { ByteArray } from './HsmDeviceCommunications.types';
+import { ByteArray } from "./HsmDeviceCommunications.types";
 
 declare class HsmDeviceCommunicationsModule extends NativeModule {
   parseBleAdvertisementWithoutDecryption(characteristicValue: string): string; // BleAdvertisementV2, but it needs to be a string to be received on the JS side
@@ -16,13 +16,15 @@ declare class HsmDeviceCommunicationsModule extends NativeModule {
     length: number
   ): number;
 
-  buildEncryptedMessage(
-    tlvs: any[],
+  writeEncrypted(
+    resourceType: string,
+    instance: string,
+    valueBase64: string,
     key: string
-  ): { first: ByteArray; second: number[] };
+  ): { encryptedData: string; tlvId: number };
 }
 
 // This call loads the native module object from the JSI.
 export default requireNativeModule<HsmDeviceCommunicationsModule>(
-  'HsmDeviceCommunications'
+  "HsmDeviceCommunications"
 );
