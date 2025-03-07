@@ -15,7 +15,29 @@ export type BleAdvertisementV2 = {
  * Enum representing the different connection states of a BLE device.
  */
 export enum BleDeviceConnectionState {
-  NO_CONNECTION = 'NO_CONNECTION',
-  BLE_CONNECTION = 'BLE_CONNECTION',
-  LORA_CONNECTION = 'LORA_CONNECTION',
+  NO_CONNECTION = "NO_CONNECTION",
+  BLE_CONNECTION = "BLE_CONNECTION",
+  LORA_CONNECTION = "LORA_CONNECTION",
 }
+
+export type BuildEncryptedReadMessage = {
+  resourceType: number;
+  instance: number;
+  appKey: string;
+};
+
+export type BuildEncryptedWriteMessage = BuildEncryptedReadMessage & {
+  value: number;
+};
+
+export type EncryptedMessagePayload = {
+  encryptedMessage: string;
+  tlvId: number;
+  resourceType: number;
+  instance: number;
+};
+
+export type DecryptedMessagePayload = {
+  value: string;
+  tlvId: number;
+};

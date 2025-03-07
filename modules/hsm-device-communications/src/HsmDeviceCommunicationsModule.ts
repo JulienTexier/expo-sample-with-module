@@ -1,6 +1,12 @@
 import { NativeModule, requireNativeModule } from "expo";
 
-import { ByteArray } from "./HsmDeviceCommunications.types";
+import {
+  BuildEncryptedReadMessage,
+  BuildEncryptedWriteMessage,
+  ByteArray,
+  DecryptedMessagePayload,
+  EncryptedMessagePayload,
+} from "./HsmDeviceCommunications.types";
 
 declare class HsmDeviceCommunicationsModule extends NativeModule {
   parseBleAdvertisementWithoutDecryption(characteristicValue: string): string; // BleAdvertisementV2, but it needs to be a string to be received on the JS side
@@ -11,17 +17,41 @@ declare class HsmDeviceCommunicationsModule extends NativeModule {
   ): ByteArray;
 
   getResourcesValuesAsInt(
-    decryptedByteArray: ByteArray,
+    decryptedByteArray: string,
     offset: number,
     length: number
   ): number;
 
-  writeEncrypted(
-    resourceType: string,
-    instance: string,
-    valueBase64: string,
-    key: string
-  ): { encryptedData: string; tlvId: number };
+  buildEncryptedReadMessage(
+    resourceType: BuildEncryptedReadMessage["resourceType"],
+    instance: BuildEncryptedReadMessage["instance"],
+    appKey: BuildEncryptedReadMessage["appKey"]
+  ): {
+    encryptedMessage: EncryptedMessagePayload["encryptedMessage"];
+    tlvId: EncryptedMessagePayload["tlvId"];
+    resourceType: EncryptedMessagePayload["resourceType"];
+    instance: EncryptedMessagePayload["instance"];
+  };
+
+  buildEncryptedWriteMessage(
+    resourceType: BuildEncryptedWriteMessage["resourceType"],
+    instance: BuildEncryptedWriteMessage["instance"],
+    appKey: BuildEncryptedWriteMessage["appKey"],
+    value: BuildEncryptedWriteMessage["value"]
+  ): {
+    encryptedMessage: EncryptedMessagePayload["encryptedMessage"];
+    tlvId: EncryptedMessagePayload["tlvId"];
+    resourceType: EncryptedMessagePayload["resourceType"];
+    instance: EncryptedMessagePayload["instance"];
+  };
+
+  interpretReceivedValue(
+    value: string,
+    appKey: string
+  ): {
+    value: DecryptedMessagePayload["value"];
+    tlvId: DecryptedMessagePayload["tlvId"];
+  };
 }
 
 // This call loads the native module object from the JSI.

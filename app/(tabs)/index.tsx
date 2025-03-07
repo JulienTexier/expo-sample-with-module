@@ -1,36 +1,21 @@
 import React, { useState } from "react";
-import { Button, Text, View } from "react-native";
+import { Alert, Button, Text, View } from "react-native";
 import DeviceModal from "~components/DeviceConnectionModal";
-import useBLE, { getEncryptionKey } from "~hooks/use-ble";
-
-function createTLVFromHex(hexString: string) {
-  // Remove "0x" prefix if present
-  const cleanHex = hexString.replace(/^0x/, "");
-
-  // Convert hex string to a byte array (2 bytes for "0007")
-  const value = new Uint8Array([
-    parseInt(cleanHex.substring(0, 2), 16), // 0x00
-    parseInt(cleanHex.substring(2, 4), 16), // 0x07
-  ]);
-
-  // Example Tag (0x01) – Change this as needed
-  const tag = 0x01;
-
-  return { tag, value };
-}
+import { useBle } from "~hooks/ble/ble-manager";
+import { getDecryptionKey, requestPermissions } from "~hooks/ble/ble-utils";
+import { useBleActions } from "~hooks/ble/use-ble-actions";
 
 export default function Bluetooth() {
   const {
-    requestPermissions,
+    bleManager,
+    data,
     scanForPeripherals,
     stopScanningForPeripherals,
     allDevices,
     connectToDevice,
-    connectedDevice,
-    data,
-    writeToDevice,
+    connectedDevices,
     disconnectFromDevice,
-  } = useBLE();
+  } = useBle("0000000000000000");
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
 
   const scanForDevices = async () => {
@@ -84,64 +69,66 @@ export default function Bluetooth() {
     },
   ];
 
-  // Encrypt and send a message
-  const sendMessage = async () => {
-    if (!connectedDevice) {
-      console.log("Device not found!");
-      return;
-    }
+  const decryptionKey = getDecryptionKey(data?.localName ?? null);
 
-    try {
-      // Locate device (it will start blinking)
-      const encryptedMessage = await writeToDevice(
-        connectedDevice.id,
-        "0007",
-        "00",
-        "1",
-        getEncryptionKey(data?.localName ?? null)
-      );
-
-      console.log("encryptedMessage", encryptedMessage);
-    } catch (error) {
-      console.error("Error while sending message:", error);
-    }
-  };
+  const { locateDevice, mapInfo, readAllResources } = useBleActions();
 
   return (
     <View style={{ flex: 1, padding: 20 }}>
-      <View style={{ flex: 1 }}>
-        {connectedDevice ? (
-          <>
-            <Text>Latest data:</Text>
-            {data ? (
-              dataInfo.map(({ label, value }) => {
-                return (
-                  <View key={label}>
-                    <Text>{label}:</Text>
-                    <Text>{value}</Text>
-                  </View>
-                );
-              })
-            ) : (
-              <Text>No data</Text>
-            )}
-            <Button onPress={sendMessage} title="Send Message" />
-          </>
-        ) : (
-          <Text>Please Connect to a device</Text>
-        )}
-      </View>
-      <Button
-        onPress={connectedDevice ? disconnectFromDevice : openModal}
-        title={connectedDevice ? "Disconnect" : "Connect"}
-      />
+      <View style={{ flex: 1, gap: 10 }}>
+        <Text>Latest data:</Text>
 
+        {data ? (
+          dataInfo.map(({ label, value }) => {
+            return (
+              <View key={label}>
+                <Text>{label}:</Text>
+                <Text>{value}</Text>
+              </View>
+            );
+          })
+        ) : (
+          <Text>No data</Text>
+        )}
+        <Button
+          disabled={!connectedDevices[0]}
+          title="Send message to device"
+          onPress={() =>
+            locateDevice(bleManager, connectedDevices[0], decryptionKey)
+          }
+        ></Button>
+        <Button
+          disabled={!connectedDevices[0]}
+          onPress={async () => {
+            await readAllResources(
+              bleManager,
+              connectedDevices[0],
+              decryptionKey
+            );
+            const res = mapInfo();
+            Alert.alert(
+              "Here are the values",
+              // Show label: value for each
+              res.map((r) => `${r.label}: ${r.value}`).join("\n")
+            );
+          }}
+          title="Read All Resources"
+        ></Button>
+        <Button
+          onPress={() =>
+            connectedDevices[0]
+              ? disconnectFromDevice(connectedDevices[0].id)
+              : openModal()
+          }
+          title={connectedDevices[0] ? "Disconnect" : "Connect"}
+        ></Button>
+      </View>
       <DeviceModal
         closeModal={hideModal}
         visible={isModalVisible}
         connectToPeripheral={connectToDevice}
-        stopScanningForPeripherals={stopScanningForPeripherals}
         devices={allDevices}
+        stopScanningForPeripherals={stopScanningForPeripherals}
       />
     </View>
   );
