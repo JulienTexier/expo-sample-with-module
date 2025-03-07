@@ -1,7 +1,7 @@
-import DeviceModal from "@/components/DeviceConnectionModal";
-import useBLE, { getEncryptionKey } from "@/hooks/use-ble";
 import React, { useState } from "react";
 import { Button, Text, View } from "react-native";
+import DeviceModal from "~components/DeviceConnectionModal";
+import useBLE, { getEncryptionKey } from "~hooks/use-ble";
 
 function createTLVFromHex(hexString: string) {
   // Remove "0x" prefix if present

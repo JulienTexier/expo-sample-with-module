@@ -1,4 +1,5 @@
 /* eslint-disable no-bitwise */
+import * as ExpoDevice from "expo-device";
 import { useMemo, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import {
@@ -7,9 +8,8 @@ import {
   Characteristic,
   Device,
 } from "react-native-ble-plx";
-import * as ExpoDevice from "expo-device";
-import HsmDeviceCommunicationsModule from "@/modules/hsm-device-communications/src/HsmDeviceCommunicationsModule";
-import { BleAdvertisementV2 } from "@/modules/hsm-device-communications";
+import { BleAdvertisementV2 } from "~modules/hsm-device-communications";
+import HsmDeviceCommunicationsModule from "~modules/hsm-device-communications/src/HsmDeviceCommunicationsModule";
 
 export const SERVICE_UUID = "af35e83e-ccc0-49aa-b2ca-337e39148225";
 export const NOTIFY_CHARACTERISTIC_UUID =
@@ -62,10 +62,12 @@ export interface BluetoothLowEnergyApi {
     length: number
   ): number | null;
 
-  buildEncryptedMessage(
-    tlvs: any[], // Replace with the actual TLV type if available
+  readFromDevice(
+    peripheralId: string,
+    resourceType: string,
+    instance: string,
     key: string
-  ): { first: Uint8Array; second: number[] } | null;
+  ): Promise<Characteristic | null>;
 
   writeToDevice(
     peripheralId: string,
@@ -73,10 +75,10 @@ export interface BluetoothLowEnergyApi {
     instance: string,
     value: string,
     key: string
-  ): { first: Uint8Array; second: number[] } | null;
+  ): Promise<Characteristic | null>;
 }
 
-function useBLE(): BluetoothLowEnergyApi {
+export function useBLE(): BluetoothLowEnergyApi {
   const bleManager = useMemo(() => new BleManager(), []);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
@@ -152,26 +154,16 @@ function useBLE(): BluetoothLowEnergyApi {
         if (device.manufacturerData) {
           const manufacturerData = device.manufacturerData;
           console.log("Manufacturer Data:", manufacturerData);
-          console.log("Data:", device);
           const results = parseBleAdvertisementWithoutDecryption(
             device.manufacturerData
           );
-          console.log("results", results);
+
           if (!results) return null;
 
           const decryptedResources = decryptResourcesValues(
             results.encryptedResourceValuesHex,
             getEncryptionKey(device.localName)
           );
-
-          if (decryptedResources) {
-            const resourcesValuesAsInt = getResourcesValuesAsInt(
-              decryptedResources,
-              0,
-              8
-            );
-            console.log("resourcesValuesAsInt", resourcesValuesAsInt);
-          }
 
           setData({
             localName: device.localName,
@@ -225,7 +217,6 @@ function useBLE(): BluetoothLowEnergyApi {
     error: BleError | null,
     characteristic: Characteristic | null
   ) => {
-    console.log(`> onDataUpdate`, error, characteristic);
     if (error) {
       console.log(error);
       return -1;
@@ -233,7 +224,6 @@ function useBLE(): BluetoothLowEnergyApi {
       console.log("No Data was recieved");
       return -1;
     }
-    console.log("characteristic", characteristic);
 
     // TODO: Figure out how we are supposed to get the correct data here.
     const results = parseBleAdvertisementWithoutDecryption(
@@ -262,16 +252,6 @@ function useBLE(): BluetoothLowEnergyApi {
         NOTIFY_CHARACTERISTIC_UUID,
         onDataUpdate
       );
-      const readCharacteristicForDeviceResult =
-        await bleManager.readCharacteristicForDevice(
-          device.id,
-          SERVICE_UUID,
-          WRITE_READ_CHARACTERISTIC_UUID
-        );
-      console.log(
-        "readCharacteristicForDeviceResult",
-        readCharacteristicForDeviceResult
-      );
     } else {
       console.log("No Device Connected");
     }
@@ -286,7 +266,7 @@ function useBLE(): BluetoothLowEnergyApi {
           characteristicValue
         )
       );
-      console.log("parseBleAdvertisementWithoutDecryption", results);
+
       return results;
     } catch (error) {
       console.error("Error while decoding:", error);
@@ -317,7 +297,6 @@ function useBLE(): BluetoothLowEnergyApi {
     length: number
   ) => {
     try {
-      // const base64String = Buffer.from(decryptedByteArray).toString('base64');
       return HsmDeviceCommunicationsModule.getResourcesValuesAsInt(
         decryptedByteArray,
         offset,
@@ -325,22 +304,6 @@ function useBLE(): BluetoothLowEnergyApi {
       );
     } catch (error) {
       console.error("Error while extracting resource values:", error);
-      return null;
-    }
-  };
-
-  const buildEncryptedMessage = (tlvs: any[], key: string) => {
-    try {
-      const result = HsmDeviceCommunicationsModule.buildEncryptedMessage(
-        tlvs,
-        key
-      );
-
-      // No need to parse it if it's already an object
-      console.log("Encrypted Message:", result);
-      return result;
-    } catch (error) {
-      console.error("Error while building encrypted message:", error);
       return null;
     }
   };
@@ -355,7 +318,7 @@ function useBLE(): BluetoothLowEnergyApi {
     try {
       const valueBase64 = Buffer.from(value).toString("base64");
 
-      const result = await HsmDeviceCommunicationsModule.writeEncrypted(
+      const result = HsmDeviceCommunicationsModule.writeEncrypted(
         resourceType,
         instance,
         valueBase64,
@@ -369,9 +332,37 @@ function useBLE(): BluetoothLowEnergyApi {
         result.encryptedData
       );
 
-      console.log("Write successful:", res);
+      return res;
     } catch (error) {
       console.error("Write failed:", error);
+      return null;
+    }
+  }
+
+  async function readFromDevice(
+    peripheralId: string,
+    resourceType: string,
+    instance: string,
+    key: string
+  ) {
+    try {
+      const result = HsmDeviceCommunicationsModule.readEncrypted(
+        resourceType,
+        instance,
+        key
+      );
+
+      const res = await bleManager.readCharacteristicForDevice(
+        peripheralId,
+        SERVICE_UUID,
+        WRITE_READ_CHARACTERISTIC_UUID,
+        result.encryptedData
+      );
+
+      return res;
+    } catch (error) {
+      console.error("Write failed:", error);
+      return null;
     }
   }
 
@@ -387,9 +378,7 @@ function useBLE(): BluetoothLowEnergyApi {
     parseBleAdvertisementWithoutDecryption,
     decryptResourcesValues,
     getResourcesValuesAsInt,
-    buildEncryptedMessage,
+    readFromDevice,
     writeToDevice,
   };
 }
-
-export default useBLE;
