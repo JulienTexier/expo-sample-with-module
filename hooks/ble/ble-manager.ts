@@ -12,6 +12,7 @@ import {
   NOTIFY_CHARACTERISTIC_UUID,
   SERVICE_UUID,
   checkBluetoothState,
+  getDecryptionKey,
   requestPermissions,
 } from "./ble-utils";
 
@@ -21,7 +22,7 @@ type Data = BleAdvertisementV2 & {
   decryptedResources: Uint8Array | null;
 };
 
-export function useBle(appKey?: string | null | undefined) {
+export function useBle() {
   const bleManager = useMemo(() => new BleManager(), []);
   const [data, setData] = useState<Data | null>(null);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
@@ -72,6 +73,8 @@ export function useBle(appKey?: string | null | undefined) {
           }
           return prevState;
         });
+
+        const appKey = getDecryptionKey(device.localName);
 
         if (!appKey) {
           console.log({ type: "error", title: `App key is required` });
@@ -223,6 +226,8 @@ export function useBle(appKey?: string | null | undefined) {
       SERVICE_UUID,
       NOTIFY_CHARACTERISTIC_UUID,
       (error, characteristic) => {
+        const appKey = getDecryptionKey(device.name);
+
         if (error) {
           console.log(error);
           return -1;
@@ -233,7 +238,7 @@ export function useBle(appKey?: string | null | undefined) {
           console.log({ type: "error", title: `App key is required` });
           return -1;
         }
-        console.log("characteristic", characteristic);
+
         interpretNotifyValue(device.name, characteristic.value, appKey);
       }
     );

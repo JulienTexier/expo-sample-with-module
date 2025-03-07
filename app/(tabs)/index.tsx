@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Alert, Button, Text, View } from "react-native";
+import { Button, View } from "react-native";
 import DeviceModal from "~components/DeviceConnectionModal";
+import ResourceList from "~components/ResourceList";
 import { useBle } from "~hooks/ble/ble-manager";
 import { getDecryptionKey, requestPermissions } from "~hooks/ble/ble-utils";
 import { useBleActions } from "~hooks/ble/use-ble-actions";
@@ -15,7 +16,7 @@ export default function Bluetooth() {
     connectToDevice,
     connectedDevices,
     disconnectFromDevice,
-  } = useBle("0000000000000000");
+  } = useBle();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
 
   const scanForDevices = async () => {
@@ -76,9 +77,9 @@ export default function Bluetooth() {
   return (
     <View style={{ flex: 1, padding: 20 }}>
       <View style={{ flex: 1, gap: 10 }}>
-        <Text>Latest data:</Text>
+        {/* <Text>Latest data:</Text> */}
 
-        {data ? (
+        {/* {data ? (
           dataInfo.map(({ label, value }) => {
             return (
               <View key={label}>
@@ -89,15 +90,22 @@ export default function Bluetooth() {
           })
         ) : (
           <Text>No data</Text>
+        )} */}
+        {connectedDevices[0] && (
+          <ResourceList
+            bleManager={bleManager}
+            connectedDevice={connectedDevices[0]}
+          />
         )}
-        <Button
+        {/* <Button
           disabled={!connectedDevices[0]}
           title="Send message to device"
           onPress={() =>
             locateDevice(bleManager, connectedDevices[0], decryptionKey)
           }
-        ></Button>
-        <Button
+        ></Button> */}
+
+        {/* <Button
           disabled={!connectedDevices[0]}
           onPress={async () => {
             await readAllResources(
@@ -113,7 +121,7 @@ export default function Bluetooth() {
             );
           }}
           title="Read All Resources"
-        ></Button>
+        ></Button> */}
         <Button
           onPress={() =>
             connectedDevices[0]

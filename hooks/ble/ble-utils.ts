@@ -15,8 +15,11 @@ export const encryptionKeyMLE = process.env
 export function getDecryptionKey(localName: string | null): string {
   if (localName === "34c5d0b42ebd5c5f") {
     return encryptionKeySoap;
+  } else if (localName === "34c5d00ab231ab21") {
+    return encryptionKeyMLE;
+  } else {
+    return "0000000000000000";
   }
-  return encryptionKeyMLE;
 }
 
 export async function requestPermissions(): Promise<boolean> {
