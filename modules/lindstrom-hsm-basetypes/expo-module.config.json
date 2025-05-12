@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["LindstromHsmBasetypesModule"] },
+  "android": {
+    "modules": [
+      "expo.modules.lindstromhsmbasetypes.LindstromHsmBasetypesModule"
+    ]
+  }
+}

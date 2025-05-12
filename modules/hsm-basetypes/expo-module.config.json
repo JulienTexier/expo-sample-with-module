@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android"],
-  "apple": {
-    "modules": ["HsmBasetypesModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.hsmbasetypes.HsmBasetypesModule"]
-  }
-}

@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["LindstromHsmCommunicationsModule"] },
+  "android": {
+    "modules": [
+      "expo.modules.lindstromhsmcommunications.LindstromHsmCommunicationsModule"
+    ]
+  }
+}
