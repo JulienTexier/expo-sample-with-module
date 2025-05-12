@@ -1,6 +1,8 @@
-import * as ExpoDevice from "expo-device";
-import { Alert, PermissionsAndroid, Platform } from "react-native";
-import { BleManager, Device } from "react-native-ble-plx";
+/* eslint-disable lingui/no-unlocalized-strings */
+// TODO: i18n this file once Marchfeld is ready
+import { Alert } from "react-native";
+import { BleManager } from "react-native-ble-plx";
+import { ResourcesAPIResponse } from "~constants/types/types";
 
 export const SERVICE_UUID = "af35e83e-ccc0-49aa-b2ca-337e39148225";
 export const NOTIFY_CHARACTERISTIC_UUID =
@@ -9,42 +11,17 @@ export const WRITE_CHARACTERISTIC_UUID = "af35e83e-ccc2-49aa-b2ca-337e39148225";
 
 // TODO: This is only used in bluetooth.tsx for testing purposes
 export const encryptionKeySoap = process.env
-  .EXPO_PUBLIC_ENCRYPTION_KEY_SOAP as string;
+  .EXPO_PUBLIC_ENCRYPTION_KEY_TISSUE as string;
 export const encryptionKeyMLE = process.env
-  .EXPO_PUBLIC_ENCRYPTION_KEY_MLE as string;
+  .EXPO_PUBLIC_ENCRYPTION_KEY_LEVEL as string;
 export function getDecryptionKey(localName: string | null): string {
-  if (localName === "34c5d0b42ebd5c5f") {
+  if (localName === "34c5d00bcf43a618") {
     return encryptionKeySoap;
-  } else if (localName === "34c5d00ab231ab21") {
+  } else if (localName === "34c5d0fa68ceffa5") {
     return encryptionKeyMLE;
   } else {
     return "0000000000000000";
   }
-}
-
-export async function requestPermissions(): Promise<boolean> {
-  if (Platform.OS === "android") {
-    if ((ExpoDevice.platformApiLevel ?? -1) < 31) {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: "Location Permission",
-          message: "Bluetooth Low Energy requires location permission.",
-          buttonPositive: "OK",
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } else {
-      const scanPermission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
-      );
-      const connectPermission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
-      );
-      return scanPermission === "granted" && connectPermission === "granted";
-    }
-  }
-  return true;
 }
 
 export async function checkBluetoothState(bleManager: BleManager) {
@@ -64,14 +41,20 @@ export async function checkBluetoothState(bleManager: BleManager) {
 
   return bleManager.onStateChange((state) => {
     if (state === "PoweredOn") {
-      console.log({ type: "success", title: "Bluetooth Enabled" });
+      // showToast({ type: 'success', title: 'Bluetooth Enabled' });
     }
   }, false);
 }
 
-export function isDuplicateDevice(
-  devices: Device[],
-  nextDevice: Device
-): boolean {
-  return devices.some((device) => device.id === nextDevice.id);
+export function transformResourceGroups(
+  resourceGroups: ResourcesAPIResponse["resourceGroups"] | undefined
+): { instance: number; resourceType: number }[] {
+  if (!resourceGroups) return [];
+
+  return resourceGroups.flatMap((group) =>
+    group.resources.map((resource: any) => ({
+      instance: resource.resourceInstanceNumber,
+      resourceType: resource.resourceType,
+    }))
+  );
 }

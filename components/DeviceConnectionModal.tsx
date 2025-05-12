@@ -1,13 +1,13 @@
 import React, { FC, useCallback } from "react";
 import {
+  Button,
   FlatList,
   ListRenderItemInfo,
   Modal,
   SafeAreaView,
-  Text,
   StyleSheet,
+  Text,
   TouchableOpacity,
-  Button,
 } from "react-native";
 import { Device } from "react-native-ble-plx";
 
@@ -27,7 +27,7 @@ type DeviceModalProps = {
 
 const DeviceModalListItem: FC<DeviceModalListItemProps> = (props) => {
   const { item, connectToPeripheral, closeModal } = props;
-
+  console.log("item", item);
   const connectAndCloseModal = useCallback(() => {
     connectToPeripheral(item.item);
     closeModal();

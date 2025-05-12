@@ -1,83 +1,113 @@
 import { create } from "zustand";
-import { DecryptedMessagePayload } from "~modules/hsm-device-communications";
 
-interface BLEState {
-  activeRequests: {
-    id: string;
-    requests: Record<
-      number,
-      { value: string | null; instance: number; resourceType: number }
-    >;
-  }[];
-  addRequest: (
-    deviceId: string,
-    tlvId: number,
-    instance: number,
-    resourceType: number
-  ) => void;
-  handleResponse: (deviceId: string, response: DecryptedMessagePayload) => void;
+export type ResourceValue = {
+  tlvId: number;
+  value: any;
+  resourceType: number;
+  instance: number;
+  tms: number;
+};
+
+export type PendingRequest = {
+  tlvId: number;
+  resourceType: number;
+  instance: number;
+  tms: number;
+};
+
+interface DeviceBleData {
+  thingseeId: string;
+  resources: ResourceValue[];
+  pendingRequests: PendingRequest[];
 }
 
-export const bleStore = create<BLEState>((set) => ({
-  activeRequests: [],
-  addRequest: (deviceId, tlvId, instance, resourceType) =>
-    set((state) => {
-      const deviceIndex = state.activeRequests.findIndex(
-        (d) => d.id === deviceId
-      );
-      const newRequests = [...state.activeRequests];
+interface BleState {
+  devices: DeviceBleData[];
+}
 
-      if (deviceIndex === -1) {
-        newRequests.push({
-          id: deviceId,
-          requests: { [tlvId]: { value: null, instance, resourceType } },
-        });
+interface BleActions {
+  actions: {
+    addPendingRequest: (thingseeId: string, request: PendingRequest) => void;
+    resolvePendingRequest: (
+      thingseeId: string,
+      tlvId: number,
+      value: any
+    ) => void;
+    clearDevice: (thingseeId: string) => void;
+    resetStore: () => void;
+  };
+}
+
+export const bleStore = create<BleState & BleActions>((set, get) => ({
+  devices: [],
+
+  actions: {
+    addPendingRequest: (thingseeId, request) => {
+      const state = get();
+      const device = state.devices.find((d) => d.thingseeId === thingseeId);
+
+      if (device) {
+        device.pendingRequests.push(request);
       } else {
-        newRequests[deviceIndex].requests[tlvId] = {
-          value: null,
-          instance,
-          resourceType,
-        };
+        state.devices.push({
+          thingseeId,
+          resources: [],
+          pendingRequests: [request],
+        });
       }
-      return { activeRequests: newRequests };
-    }),
 
-  handleResponse: (deviceId, response) =>
-    set((state) => {
-      const deviceIndex = state.activeRequests.findIndex(
-        (d) => d.id === deviceId
+      set({ devices: [...state.devices] });
+    },
+
+    resolvePendingRequest: (thingseeId, tlvId, value) => {
+      const state = get();
+      const device = state.devices.find((d) => d.thingseeId === thingseeId);
+      if (!device) return;
+
+      const reqIndex = device.pendingRequests.findIndex(
+        (r) => r.tlvId === tlvId
       );
-      if (deviceIndex === -1) return state;
-      const newRequests = [...state.activeRequests];
-      newRequests[deviceIndex].requests[response.tlvId] = {
-        ...newRequests[deviceIndex].requests[response.tlvId],
-        value: response.value,
+      if (reqIndex === -1) return;
+
+      const [request] = device.pendingRequests.splice(reqIndex, 1);
+
+      // Replace or add new resource value
+      const existingIndex = device.resources.findIndex(
+        (res) =>
+          res.resourceType === request.resourceType &&
+          res.instance === request.instance
+      );
+
+      const newResourceValue: ResourceValue = {
+        tlvId,
+        value,
+        resourceType: request.resourceType,
+        instance: request.instance,
+        tms: Date.now(),
       };
 
-      return { activeRequests: newRequests };
-    }),
+      if (existingIndex !== -1) {
+        device.resources[existingIndex] = newResourceValue;
+      } else {
+        device.resources.push(newResourceValue);
+      }
+      console.log(`🔁 TLV ${tlvId} resolved with value:`, value);
+      set({ devices: [...state.devices] });
+    },
+
+    clearDevice: (thingseeId) => {
+      const updated = get().devices.filter((d) => d.thingseeId !== thingseeId);
+      set({ devices: updated });
+    },
+
+    resetStore: () => {
+      set({ devices: [] });
+    },
+  },
 }));
 
-export const useBleStore = bleStore;
+const useBleStore = bleStore;
 
-export function addRequest(
-  deviceId: string,
-  tlvId: number,
-  instance: number,
-  resourceType: number
-) {
-  bleStore.getState().addRequest(deviceId, tlvId, instance, resourceType);
-}
+export const useBleDevices = () => useBleStore((s) => s.devices);
 
-export function handleResponse(
-  deviceId: string,
-  response: DecryptedMessagePayload
-) {
-  bleStore.getState().handleResponse(deviceId, response);
-}
-
-export function clearStore() {
-  bleStore.getState().activeRequests = [];
-}
-
-export const activeRequests = bleStore.getState().activeRequests;
+export const useBleActions = () => useBleStore((s) => s.actions);

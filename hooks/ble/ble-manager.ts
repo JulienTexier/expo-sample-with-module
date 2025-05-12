@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
-import { BleManager, Device } from "react-native-ble-plx";
-import { BleAdvertisementV2 } from "~modules/hsm-device-communications";
+/* eslint-disable lingui/no-unlocalized-strings */
+// TODO: i18n this file once Marchfeld is ready
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Device as BleDevice, BleManager } from "react-native-ble-plx";
 
 import {
-  decryptResourcesValues,
-  interpretNotifyValue,
+  handleNotifyFromDevice,
   parseBleAdvertisementWithoutDecryption,
 } from "./ble-communication";
 import {
@@ -13,240 +12,254 @@ import {
   SERVICE_UUID,
   checkBluetoothState,
   getDecryptionKey,
-  requestPermissions,
 } from "./ble-utils";
 
-type Data = BleAdvertisementV2 & {
-  localName: string | null;
-  id: string | null;
-  decryptedResources: Uint8Array | null;
-};
-
+const SCAN_TIMEOUT_MS = 10_000;
 export function useBle() {
   const bleManager = useMemo(() => new BleManager(), []);
-  const [data, setData] = useState<Data | null>(null);
-  const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [connectedDevices, setConnectedDevices] = useState<Device[]>([]);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [connectedDevices, setConnectedDevices] = useState<BleDevice[]>([]);
+  const [allDevices, setAllDevices] = useState<BleDevice[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Helper to manage timeout logic for scanning
+  const withScanTimeout = (
+    onTimeout: () => void,
+    duration: number = SCAN_TIMEOUT_MS
+  ) => {
+    const timeoutId = setTimeout(onTimeout, duration);
+    return () => clearTimeout(timeoutId);
+  };
 
   useEffect(() => {
-    const checkState = async () => {
-      const currentState = await bleManager.state();
-      if (currentState === "PoweredOff") {
-        Alert.alert("Bluetooth", "Please enable Bluetooth", [
-          { text: "Cancel" },
-          { text: "OK", onPress: async () => await bleManager.enable() },
-        ]);
-      }
-    };
-    checkState();
+    checkBluetoothState(bleManager);
   }, [bleManager]);
 
-  const isDuplicateDevice = (devices: Device[], nextDevice: Device) =>
+  const stopScanningForPeripherals = useCallback(() => {
+    console.log("> Stop Bluetooth scanning");
+    bleManager.stopDeviceScan();
+    setIsScanning(false);
+    // advertisementQueue.endScanSession();
+    // showToast({ type: 'info', title: 'Scan stopped' });
+  }, [bleManager]);
+
+  const isDuplicateDevice = (devices: BleDevice[], nextDevice: BleDevice) =>
     // eslint-disable-next-line lodash/prefer-some
     devices.findIndex((device) => nextDevice.id === device.id) > -1;
 
-  const scanForPeripherals = async () => {
-    const isPermissionsEnabled = await requestPermissions();
-    if (!isPermissionsEnabled) {
-      console.log({
-        type: "error",
-        title: "Permissions not enabled",
-        subtitle: "Please enable Bluetooth and Location permissions",
-      });
-    }
+  const scanForPeripherals = async (): // areas: any
+  Promise<Pick<ScanAndConnectResult, "advertisementSent">> => {
+    console.log("> Start background scanning");
+    setIsScanning(true);
+    // advertisementQueue.startScanSession();
 
-    bleManager.startDeviceScan(null, null, (error, device) => {
-      if (error) return console.error(error);
-      if (device?.serviceUUIDs?.includes(SERVICE_UUID)) {
-        if (!device.manufacturerData) return;
-
-        const results = parseBleAdvertisementWithoutDecryption(
+    bleManager.startDeviceScan(null, null, async (error, device) => {
+      if (error) {
+        console.error(`[BLE Scan Error]: ${error.message}`, error);
+        return { advertisementSent: false };
+      }
+      if (
+        device?.serviceUUIDs?.includes(SERVICE_UUID) &&
+        device.manufacturerData &&
+        device.localName
+      ) {
+        const parsed = parseBleAdvertisementWithoutDecryption(
           device.manufacturerData
         );
-
-        if (!results) return null;
-
-        setAllDevices((prevState: Device[]) => {
+        console.log("parsed", parsed);
+        setAllDevices((prevState: BleDevice[]) => {
           if (!isDuplicateDevice(prevState, device)) {
             return [...prevState, device];
           }
           return prevState;
         });
+        // const deviceId =
+        //   parsed && findDeviceIdByThingseeId(device.localName, areas);
 
-        const appKey = getDecryptionKey(device.localName);
+        // if (deviceId) {
+        //   // const result = await advertisementQueue.addAdvertisement({
+        //   //   networkId: device.localName,
+        //   //   manufacturerData: device.manufacturerData,
+        //   //   deviceType: parsed.deviceType,
+        //   //   oemType: parsed.oemType,
+        //   //   deviceId,
+        //   // });
 
-        if (!appKey) {
-          console.log({ type: "error", title: `App key is required` });
-          return null;
-        }
-
-        const decryptedResources = decryptResourcesValues(
-          results.encryptedResourceValuesHex,
-          appKey
-        );
-
-        setData({
-          localName: device.localName,
-          id: device.id,
-          ...results,
-          decryptedResources,
-        });
-      }
-    });
-  };
-
-  const backgroundScan = async (areas: any) => {
-    const isPermissionsEnabled = await requestPermissions();
-    if (!isPermissionsEnabled) {
-      console.log({
-        type: "error",
-        title: "Permissions not enabled",
-        subtitle: "Please enable Bluetooth and Location permissions",
-      });
-    }
-
-    bleManager.startDeviceScan(null, null, (error, device) => {
-      if (error) return console.error(error);
-      if (device?.serviceUUIDs?.includes(SERVICE_UUID)) {
-        if (!device.manufacturerData) return;
-        console.log("device.manufacturerData", device);
-        const results = parseBleAdvertisementWithoutDecryption(
-          device.manufacturerData
-        );
-
-        console.log("results", device.localName, results);
-
-        if (!results || !device.localName) return null;
-
-        // const registeredDeviceId = findDeviceIdByThingseeId(
-        //   device.localName,
-        //   areas
-        // );
-        // if (registeredDeviceId) {
-        //   sendAdvertisementData({
-        //     networkId: device.localName,
-        //     manufacturerData: device.manufacturerData,
-        //   });
+        //   if (result.success) {
+        //     console.log(`Advertisement data sent for ${device.localName}`);
+        //     return { advertisementSent: false };
+        //   } else {
+        //     console.warn(
+        //       `Failed to send advertisement data for ${device.localName}`
+        //     );
+        //     return { advertisementSent: false };
+        //   }
         // }
+        return { advertisementSent: true };
       }
     });
+    return { advertisementSent: false };
   };
 
-  const stopScanningForPeripherals = () => {
-    bleManager.stopDeviceScan();
-    setIsConnecting(false);
-    console.log({ type: "info", title: `Scan stopped` });
+  const backgroundScan = async () => {
+    const result = await scanForPeripherals();
+
+    // Use timeout to stop scanning
+    const cancelTimeout = withScanTimeout(
+      () => stopScanningForPeripherals(),
+      SCAN_TIMEOUT_MS
+    );
+
+    return { ...result, cancelTimeout };
   };
 
-  const connectToDevice = async (device: Device) => {
-    try {
-      setIsConnecting(true);
-      const connectedDevice = await bleManager.connectToDevice(device.id);
-      await connectedDevice.discoverAllServicesAndCharacteristics();
-      setConnectedDevices((prev) => [...prev, connectedDevice]);
-      startStreamingData(connectedDevice);
-      console.log({ type: "success", title: "Connected" });
-      return connectedDevice;
-    } catch (error) {
-      console.error("Connection failed", error);
-    } finally {
-      setIsConnecting(false);
-      stopScanningForPeripherals();
-    }
+  const connectToDevice = useCallback(
+    async (device: BleDevice) => {
+      // Prevent duplicate connections
+      if (connectedDevices.some((d) => d.id === device.id)) {
+        console.log(`Device ${device.id} already connected`);
+        return device;
+      }
+
+      try {
+        setIsConnecting(true);
+        const connected = await bleManager.connectToDevice(device.id, {
+          requestMTU: 256,
+        });
+        await connected.discoverAllServicesAndCharacteristics();
+        const appKey = getDecryptionKey(device?.localName ?? null);
+        setConnectedDevices((prev) => [...prev, connected]);
+        startStreamingData(connected, appKey);
+
+        // showToast({ type: 'success', title: 'Connected' });
+        return connected;
+      } catch (error) {
+        console.error(`[BLE Connection Error]: `, error);
+      } finally {
+        setIsConnecting(false);
+        stopScanningForPeripherals();
+      }
+    },
+    [bleManager, connectedDevices, stopScanningForPeripherals]
+  );
+
+  type ScanAndConnectResult = {
+    connected: boolean;
+    advertisementSent: boolean;
   };
 
-  const scanAndConnectToDevice = async (deviceId: string): Promise<boolean> => {
+  const scanAndConnectToDevice = async (
+    device: any
+  ): Promise<ScanAndConnectResult> => {
     const state = await checkBluetoothState(bleManager);
     if (state === "PoweredOff") {
-      return false;
-    }
-
-    const isPermissionsEnabled = await requestPermissions();
-    if (!isPermissionsEnabled) {
-      console.log({
-        type: "error",
-        title: "Permissions not enabled",
-        subtitle: "Please enable Bluetooth and Location permissions",
-      });
+      return { connected: false, advertisementSent: false };
     }
 
     setIsConnecting(true);
-    console.log({
-      type: "info",
-      title: "Scanning for device",
-      subtitle: "This may take a few seconds",
-    });
+    // advertisementQueue.startScanSession();
+
+    // showToast({
+    //   type: 'info',
+    //   title: 'Scanning for device',
+    //   subtitle: 'This may take a few seconds',
+    // });
 
     return new Promise((resolve) => {
-      const scanTimeout = setTimeout(() => {
-        bleManager.stopDeviceScan();
-        setIsConnecting(false);
-        console.log({
-          type: "error",
-          title: `Connection Timeout`,
-          subtitle: `Could not connect to device`,
-        });
-        resolve(false);
-      }, 10000); // 10 seconds
+      let advertisementSent = false;
 
-      bleManager.startDeviceScan(null, null, async (error, device) => {
+      const cancelTimeout = withScanTimeout(() => {
+        bleManager.stopDeviceScan();
+        // advertisementQueue.endScanSession();
+        setIsConnecting(false);
+
+        // showToast({
+        //   type: 'error',
+        //   title: 'Connection Timeout',
+        //   subtitle: 'Could not connect to device',
+        // });
+
+        resolve({ connected: false, advertisementSent });
+      });
+
+      bleManager.startDeviceScan(null, null, async (error, bleDevice) => {
         if (error) {
-          console.log(error);
-          clearTimeout(scanTimeout);
-          resolve(false);
+          console.error(`[BLE Scan Error]: ${error.message}`, error);
+          cancelTimeout();
+          resolve({ connected: false, advertisementSent });
+          return;
         }
 
-        if (device && device.localName === deviceId) {
+        if (bleDevice && bleDevice.localName === device.thingseeId) {
+          if (bleDevice.manufacturerData && bleDevice.localName) {
+            const parsed = parseBleAdvertisementWithoutDecryption(
+              bleDevice.manufacturerData
+            );
+            if (parsed) {
+              // const result = await advertisementQueue.addAdvertisement({
+              //   networkId: bleDevice.localName,
+              //   manufacturerData: bleDevice.manufacturerData,
+              //   deviceType: parsed.deviceType,
+              //   oemType: parsed.oemType,
+              //   deviceId: device.id,
+              // });
+              // if (result.success) advertisementSent = true;
+            }
+          }
+
           bleManager.stopDeviceScan();
-          clearTimeout(scanTimeout);
-          const connectedDevice = await connectToDevice(device);
+          // advertisementQueue.endScanSession();
+          cancelTimeout();
+          const connected = await connectToDevice(bleDevice);
           setIsConnecting(false);
 
-          if (connectedDevice) {
-            resolve(true);
-          } else {
-            resolve(false);
-          }
+          resolve({ connected: !!connected, advertisementSent });
         }
       });
     });
   };
 
-  const disconnectFromDevice = (deviceId: string) => {
-    if (connectedDevices.length) {
+  const disconnectFromDevice = useCallback(
+    (deviceId: string) => {
+      if (!connectedDevices.length) return;
+
       bleManager.cancelDeviceConnection(deviceId);
       setConnectedDevices((prev) => prev.filter((d) => d.id !== deviceId));
-      console.log({ type: "info", title: "Disconnected" });
-    }
-  };
+      // showToast({ type: 'info', title: 'Disconnected' });
+    },
+    [bleManager, connectedDevices]
+  );
 
-  const startStreamingData = (device: Device) => {
+  const startStreamingData = (device: BleDevice, appKey: string) => {
     device.monitorCharacteristicForService(
       SERVICE_UUID,
       NOTIFY_CHARACTERISTIC_UUID,
       (error, characteristic) => {
-        const appKey = getDecryptionKey(device.name);
-
         if (error) {
-          console.log(error);
-          return -1;
-        } else if (!characteristic?.value) {
-          console.log("No Data was received");
-          return -1;
-        } else if (!appKey) {
-          console.log({ type: "error", title: `App key is required` });
-          return -1;
+          console.warn(`[BLE Notification Error]: ${error.message}`, error);
+          return;
         }
 
-        interpretNotifyValue(device.name, characteristic.value, appKey);
+        const value = characteristic?.value;
+        if (!value || !device.name) {
+          console.warn("No data received or device name missing");
+          return;
+        }
+
+        console.log(
+          "> Notification received for device",
+          device.name,
+          value,
+          appKey
+        );
+        handleNotifyFromDevice(value, device.name, appKey);
       }
     );
   };
 
   return {
     bleManager,
-    data,
+    isScanning,
     isConnecting,
     allDevices,
     connectedDevices,

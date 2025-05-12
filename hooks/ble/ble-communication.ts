@@ -1,24 +1,25 @@
-import HsmDeviceCommunicationsModule, {
-  BleAdvertisementV2,
-} from "~modules/hsm-device-communications";
-
 import { Characteristic } from "react-native-ble-plx";
 
-import { addRequest, handleResponse } from "~stores/washroom/ble-store";
-
+import HsmDeviceCommunicationsModule, {
+  BleAdvertisementV2,
+} from "~modules/lindstrom-hsm-communications";
+import { bleStore } from "~stores/washroom/ble-store";
 import { SERVICE_UUID, WRITE_CHARACTERISTIC_UUID } from "./ble-utils";
-import { ReadFromDeviceProps, WriteToDeviceProps } from "./types";
+import {
+  ReadAllFromDeviceProps,
+  ReadFromDeviceProps,
+  WriteToDeviceProps,
+} from "./types";
 
 export function parseBleAdvertisementWithoutDecryption(
-  characteristicValue: string
-) {
+  manufacturerData: string
+): BleAdvertisementV2 | null {
   try {
     const results: BleAdvertisementV2 = JSON.parse(
       HsmDeviceCommunicationsModule.parseBleAdvertisementWithoutDecryption(
-        characteristicValue
+        manufacturerData
       )
     );
-
     return results;
   } catch (error) {
     console.error("Error while decoding:", error);
@@ -29,16 +30,16 @@ export function parseBleAdvertisementWithoutDecryption(
 export function decryptResourcesValues(
   encryptedResourceValuesHex: string,
   decryptionKey: string
-) {
+): Uint8Array | null {
   try {
     const result = HsmDeviceCommunicationsModule.decryptResourcesValues(
       encryptedResourceValuesHex,
       decryptionKey
     );
-    // console.log("Decoded Result:", result); // Log the result to check what is returned
+    console.log("Decoded Result:", result);
     return result;
   } catch (error) {
-    console.error("Error while decoding:", error);
+    console.error("Error while decrypting resource values:", error);
     return null;
   }
 }
@@ -47,7 +48,7 @@ export function getResourcesValuesAsInt(
   decryptedByteArray: string,
   offset: number,
   length: number
-) {
+): number | null {
   try {
     return HsmDeviceCommunicationsModule.getResourcesValuesAsInt(
       decryptedByteArray,
@@ -60,6 +61,21 @@ export function getResourcesValuesAsInt(
   }
 }
 
+export function getDataTypeInt(resourceDataType: string) {
+  const dataTypes = HsmDeviceCommunicationsModule.getDataTypes();
+  const dataTypeArray = Object.entries(dataTypes).map(([key, value]) => ({
+    key: Number(key),
+    value,
+  }));
+
+  const dataType = dataTypeArray.find(
+    (r) => r.value === resourceDataType.toUpperCase()
+  );
+  if (!dataType) throw new Error("Data type not found");
+
+  return dataType.key;
+}
+
 export async function writeToDevice({
   bleManager,
   peripheralId,
@@ -68,6 +84,7 @@ export async function writeToDevice({
   instance,
   appKey,
   value,
+  dataType,
 }: WriteToDeviceProps): Promise<Characteristic | null> {
   try {
     if (!deviceName) throw new Error("Device not connected");
@@ -76,17 +93,29 @@ export async function writeToDevice({
       resourceType,
       instance,
       appKey,
-      value
+      value,
+      dataType
     );
 
-    console.log(`> Sending write request for TLVID: ${result.tlvId}`);
-    addRequest(deviceName, result.tlvId, result.instance, result.resourceType);
+    const { tlvId, encryptedMessage } = result;
+
+    console.log(`> Sending write request for TLVID: ${tlvId}`, {
+      resourceType,
+      instance,
+    });
+
+    bleStore.getState().actions.addPendingRequest(deviceName, {
+      tlvId,
+      resourceType,
+      instance,
+      tms: Date.now(),
+    });
 
     const res = await bleManager.writeCharacteristicWithResponseForDevice(
       peripheralId,
       SERVICE_UUID,
       WRITE_CHARACTERISTIC_UUID,
-      result.encryptedMessage
+      encryptedMessage
     );
 
     return res;
@@ -103,45 +132,112 @@ export async function readFromDevice({
   resourceType,
   instance,
   appKey,
-}: ReadFromDeviceProps): Promise<Characteristic | null> {
+}: ReadFromDeviceProps) {
   try {
     if (!deviceName) throw new Error("Device not connected");
+
     const result = HsmDeviceCommunicationsModule.buildEncryptedReadMessage(
       resourceType,
       instance,
       appKey
     );
 
-    console.log(`> Sending read request for TLVID: ${result.tlvId}`, {
+    const { tlvId, encryptedMessage } = result;
+
+    console.log(`> Sending read request for TLVID: ${tlvId}`, {
       resourceType,
       instance,
     });
-    addRequest(deviceName, result.tlvId, result.instance, result.resourceType);
 
-    const res = await bleManager.writeCharacteristicWithResponseForDevice(
+    bleStore.getState().actions.addPendingRequest(deviceName, {
+      tlvId,
+      resourceType,
+      instance,
+      tms: Date.now(),
+    });
+
+    const char = await bleManager.writeCharacteristicWithResponseForDevice(
       peripheralId,
       SERVICE_UUID,
       WRITE_CHARACTERISTIC_UUID,
-      result.encryptedMessage
+      encryptedMessage
     );
 
-    return res;
+    console.log("Write characteristic response:", char);
+    return char;
   } catch (error) {
     console.error("Read failed:", error);
     return null;
   }
 }
 
-export async function interpretNotifyValue(
-  deviceId: string | null,
-  characteristicValue: string,
+export async function readAllFromDevice({
+  bleManager,
+  peripheralId,
+  deviceName,
+  resources,
+  appKey,
+}: ReadAllFromDeviceProps) {
+  try {
+    if (!deviceName) throw new Error("Device not connected");
+
+    const BATCH_SIZE = 15; // Based on estimated 256 MTU -> ~16 TLVs
+    const batches = [];
+
+    for (let i = 0; i < resources.length; i += BATCH_SIZE) {
+      batches.push(resources.slice(i, i + BATCH_SIZE));
+    }
+
+    for (const batch of batches) {
+      const result = HsmDeviceCommunicationsModule.buildEncryptedReadMessages(
+        batch,
+        appKey
+      );
+
+      batch.forEach((res, index) => {
+        const tlvId = result.tlvIds[index];
+        bleStore.getState().actions.addPendingRequest(deviceName, {
+          tlvId,
+          resourceType: res.resourceType,
+          instance: res.instance,
+          tms: Date.now(),
+        });
+      });
+
+      await bleManager.writeCharacteristicWithResponseForDevice(
+        peripheralId,
+        SERVICE_UUID,
+        WRITE_CHARACTERISTIC_UUID,
+        result.encryptedMessage
+      );
+    }
+    console.log("> Read all completed successfully");
+    return true;
+  } catch (error) {
+    console.error("Read all failed:", error);
+    return null;
+  }
+}
+
+export async function handleNotifyFromDevice(
+  base64EncryptedNotifyValue: string,
+  deviceName: string,
   appKey: string
 ) {
-  const response = HsmDeviceCommunicationsModule.interpretReceivedValue(
-    characteristicValue,
-    appKey
-  );
-  console.log("> READ response", response);
-  if (!deviceId) return;
-  handleResponse(deviceId, response);
+  try {
+    const decrypted =
+      await HsmDeviceCommunicationsModule.interpretReceivedValue(
+        base64EncryptedNotifyValue,
+        appKey
+      );
+
+    decrypted.forEach(({ tlvId, value }) => {
+      console.log("tlvId", tlvId, value);
+      bleStore
+        .getState()
+        .actions.resolvePendingRequest(deviceName, tlvId, value);
+    });
+  } catch (error) {
+    console.error("Notification handling failed:", error);
+  }
 }
