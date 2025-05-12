@@ -18,22 +18,41 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
    This command will create the `android` and `ios` directories, which are required for building the app for Android and iOS.
 
-3. Start the android app
+3. Start the Android app
 
    ```bash
-    npm run android
+   npm run android
    ```
 
-4. Start the ios app
+4. Start the iOS app
+
+   Before running the iOS app, you need to manually add the required HsM libraries. Follow these steps:
+
+   - Open the `ios` directory in Xcode by running the following command from the root of the project:
+
+     ```bash
+     xed ios/
+     ```
+
+   - In Xcode, navigate to `File > Add Package Dependencies`. Then:
+     - Add the package to the project: `Pods`
+     - Add the package to the target: `LindstromHsmBasetypes`
+
+   Once the dependencies are added, you can run the app:
 
    ```bash
-    npm run ios
+   npm run ios
    ```
+
+   Alternatively, you can build and run the app directly from Xcode.
 
 > [!IMPORTANT]  
-> Whenever you make native changes, you have the run prebuild and rebuild your apps.
+> The Communications library currentlty does not work. To test the BaseTypes one, comment out the entire `ble-communications.tsx` file in the `app` directory. This will allow you to run the app without any issues.
 
-In the output, you'll find options to open the app in a
+> [!IMPORTANT]  
+> Whenever you make native changes, you must run the prebuild command and rebuild your apps.
+
+In the output, you'll find options to open the app in a:
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
